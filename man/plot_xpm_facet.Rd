@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_functions.R
 \name{plot_xpm_facet}
 \alias{plot_xpm_facet}
-\title{generate faceted plots from xpm Data}
+\title{generate faceted plots from xpm data}
 \usage{
 plot_xpm_facet(xpm_data, plot_type = "scatter")
 }

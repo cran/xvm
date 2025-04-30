@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_functions.R
 \name{plot_xpm_3d}
 \alias{plot_xpm_3d}
-\title{generate 3d scatter plot from xpm Data}
+\title{generate 3d scatter plot from xpm data}
 \usage{
 plot_xpm_3d(xpm_data, reversescale = FALSE, point_size = 2)
 }

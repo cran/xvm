@@ -2,7 +2,7 @@
 % Please edit documentation in R/read_functions.R
 \name{parse_xvg}
 \alias{parse_xvg}
-\title{parse xvg File Content}
+\title{parse xvg file content}
 \usage{
 parse_xvg(lines, skip_comments = TRUE)
 }

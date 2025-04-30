@@ -4,14 +4,25 @@
 \alias{plot_xvg}
 \title{plot xvg data}
 \usage{
-plot_xvg(xvg_data, title = NULL, subtitle = NULL, ...)
+plot_xvg(
+  xvg_data,
+  merge = FALSE,
+  title = NULL,
+  subtitle = NULL,
+  use_color_scale = NULL,
+  ...
+)
 }
 \arguments{
 \item{xvg_data}{xvg data object returned by read_xvg}
 
+\item{merge}{logical; if TRUE and multiple datasets provided, merge them (default: FALSE)}
+
 \item{title}{chart title (default uses xvg file's title)}
 
 \item{subtitle}{chart subtitle (default uses xvg file's subtitle)}
+
+\item{use_color_scale}{custom color scale function (e.g., ggsci::scale_color_bmj) to override default colors}
 
 \item{...}{additional parameters passed to ggplot2::geom_line}
 }

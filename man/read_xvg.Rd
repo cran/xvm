@@ -15,7 +15,7 @@ read_xvg(xvg_files, skip_comments = TRUE)
 Named list containing xvg data, using filenames (without extension) as keys
 }
 \description{
-read one or more GROMACS-generated xvg files
+read one or more 'GROMACS'-generated xvg files
 }
 \examples{
 \donttest{

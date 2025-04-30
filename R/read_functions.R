@@ -15,10 +15,8 @@
 #'
 #' @keywords internal
 parse_xpm <- function(xpm_content) {
-  # Split content into lines
   lines <- strsplit(xpm_content, "\n")[[1]]
 
-  # Extract metadata
   title_line <- grep("title:", lines, value = TRUE)
   title <- gsub(".*\"(.*)\".*", "\\1", title_line)
 
@@ -31,7 +29,6 @@ parse_xpm <- function(xpm_content) {
   y_label_line <- grep("y-label:", lines, value = TRUE)
   y_label <- gsub(".*\"(.*)\".*", "\\1", y_label_line)
 
-  # Extract matrix dimensions and color count
   dim_line <- grep("^\"[0-9]+ [0-9]+", lines, value = TRUE)
   dim_clean <- gsub("\"(.*)\".*", "\\1", dim_line)
   dims <- as.numeric(strsplit(dim_clean, "[ \t]+")[[1]])
@@ -42,18 +39,16 @@ parse_xpm <- function(xpm_content) {
 
   message("Dimensions parsed: width = ", width, ", height = ", height, ", colors = ", num_colors, "\n")
 
-  # Extract color mappings
   color_map <- list()
   color_values <- list()
 
   color_lines <- grep("^\".*c #[0-9A-Fa-f].*(/\\*.*\\*/)?", lines)
 
-  # Verify color count
   detected_colors <- length(color_lines)
   if (detected_colors != num_colors) {
     warning(sprintf("Color count mismatch: XPM declares %d colors, but %d color definitions found",
                     num_colors, detected_colors))
-    # Use the actual detected color count
+
     num_colors <- min(num_colors, detected_colors)
   }
 
@@ -63,10 +58,9 @@ parse_xpm <- function(xpm_content) {
     color_code <- gsub("^\"([^\"]+)\".*", "\\1", color_line)
     color_code <- gsub("^([^ ]+).*", "\\1", color_code)
 
-    # Extract hex color
     hex_color <- gsub(".*#([0-9A-Fa-f]+).*", "\\1", color_line)
 
-    # Extract value with improved pattern matching
+
     value_pattern <- "/\\* *\"([-0-9.]+)\" *\\*/"
     value_match <- regexec(value_pattern, color_line)
 
@@ -76,14 +70,14 @@ parse_xpm <- function(xpm_content) {
                           value_match[[1]][2] + attr(value_match[[1]], "match.length")[2] - 1)
       value <- as.numeric(value_str)
     } else {
-      # Fallback if pattern doesn't match
+
       value_parts <- strsplit(color_line, "/\\*")[[1]]
       if (length(value_parts) > 1) {
         value_str <- gsub("\"([-0-9.]+)\".*", "\\1", value_parts[2])
         value <- suppressWarnings(as.numeric(value_str))
         if (is.na(value)) {
-          # Final fallback: use index-based value
-          value <- i - 1  # 0-based index common in color maps
+
+          value <- i - 1
         }
       } else {
         value <- i - 1
@@ -146,7 +140,7 @@ parse_xpm <- function(xpm_content) {
     }
   }
 
-  # Create data frame
+
   df <- expand.grid(x = 1:width, y = 1:height)
   df$value <- as.vector(t(data_matrix))
 
@@ -162,8 +156,7 @@ parse_xpm <- function(xpm_content) {
   } else {
     df$y_actual <- df$y
   }
-
-  return(list(
+  result <- list(
     data = df,
     title = title,
     legend = legend,
@@ -171,7 +164,9 @@ parse_xpm <- function(xpm_content) {
     y_label = y_label,
     color_map = color_map,
     color_values = color_values
-  ))
+  )
+  class(result) <- "xpm_data"
+  return(result)
 }
 
 #' @title read xpm files
@@ -210,7 +205,6 @@ read_xpm <- function(xpm_files) {
     stop("xpm_files must be a character vector containing one or more XPM file paths")
   }
 
-  # Check file existence
   missing_files <- xpm_files[!file.exists(xpm_files)]
   if (length(missing_files) > 0) {
     warning("The following files do not exist: ", paste(missing_files, collapse = ", "))
@@ -221,7 +215,6 @@ read_xpm <- function(xpm_files) {
     stop("No valid XPM files to read")
   }
 
-  # Process files
   results <- list()
   for (file_path in xpm_files) {
     xpm_content <- paste(readLines(file_path), collapse = "\n")
@@ -249,7 +242,7 @@ format_text <- function(text) {
   return(text)
 }
 
-#' @title parse xvg File Content
+#' @title parse xvg file content
 #' @description parses content from a single GROMACS-generated xvg file
 #' @param lines character vector of text lines from xvg file
 #' @param skip_comments logical indicating whether to skip comment lines (default: TRUE)
@@ -328,12 +321,12 @@ parse_xvg <- function(lines, skip_comments = TRUE) {
       legends_formatted = legends_formatted
     )
   )
-
+  class(result) <- "xvg_data"
   return(result)
 }
 
 #' @title read xvg files
-#' @description read one or more GROMACS-generated xvg files
+#' @description read one or more 'GROMACS'-generated xvg files
 #'
 #' @param xvg_files character vector of xvg file paths
 #' @param skip_comments logical indicating whether to skip comment lines (default: TRUE)
@@ -371,6 +364,117 @@ read_xvg <- function(xvg_files, skip_comments = TRUE) {
   }
 
   return(results)
+}
+
+#' @title merge multiple xvg data objects
+#' @description combines multiple xvg data objects into a single structure, preserving metadata from the first object
+#' and adding a group identifier to track the source of each data point.
+#'
+#' @param xvg_data a list of xvg data objects, each containing 'data' and 'metadata' components
+#'
+#' @return a merged xvg data object with:
+#' \itemize{
+#'   \item data - Combined data frame with an additional 'group' column identifying the source
+#'   \item metadata - Metadata from the first object in the list
+#' }
+#' @keywords internal
+merge_xvg_data<-function(xvg_data){
+  n_col <- sapply(xvg_data,function(x){ncol(x$data)})
+  if(length(unique(n_col)) > 1) stop("Inconsistent number of columns detected in the input data.")
+  xaxis <- sapply(xvg_data,function(x){x$metadata$xaxis})
+  yaxis <- sapply(xvg_data,function(x){x$metadata$yaxis})
+  title <- lapply(xvg_data,function(x){x$metadata$title})
+  subtitle <- lapply(xvg_data,function(x){x$metadata$subtitle})
+  xaxis_formatted <- sapply(xvg_data,function(x){x$metadata$xaxis_formatted})
+  yaxis_formatted <- sapply(xvg_data,function(x){x$metadata$yaxis_formatted})
+  legends <- lapply(xvg_data,function(x){x$metadata$legends})
+  legends_formatted <- lapply(xvg_data,function(x){x$metadata$legends_formatted})
+  xaxis <- xaxis[1]
+  yaxis <- yaxis[1]
+  title <- title[1]  |> unlist()
+  subtitle <- subtitle[1]  |> unlist()
+  xaxis_formatted <- xaxis_formatted[1]
+  yaxis_formatted <- yaxis_formatted[1]
+  legends <- legends[1] |> unlist()
+  legends_formatted <- legends_formatted[1]  |> unlist()
+  col_names <- colnames(xvg_data[[1]]$data)
+  data <- lapply(names(xvg_data), function(x){
+    dat<-xvg_data[[x]]$data
+    colnames(dat) <- col_names
+    dat$group<-x
+    return(dat)
+  })
+  data <- do.call(rbind,data,)
+  return(list(data = data,
+              metadata = list(title = title,
+                              subtitle = subtitle,
+                              xaxis = xaxis,
+                              yaxis = yaxis,
+                              xaxis_formatted = xaxis_formatted,
+                              yaxis_formatted = yaxis_formatted,
+                              legends = legends,
+                              legends_formatted = legends_formatted,
+                              file_path = NULL)))
+}
+
+#' @title export xvg data object
+#' @description write the data component of an \code{xvg_data} object (or multiple objects) to a delimited text file,
+#' controlled via the \code{sep} parameter rather than file extension detection.
+#'
+#' @param xvg_data An object of class \code{xvg_data}, or a list of \code{xvg_data} objects, as returned by \code{read_xvg()}.
+#' @param file Path to the output file (any extension is acceptable).
+#' @param sep Field separator (e.g., "\\t" for TSV, "," for CSV). Default is "\\t".
+#' @param row.names Logical, whether to write row names. Default is FALSE.
+#' @param merge Logical, whether to merge multiple xvg_data objects before exporting. Default is FALSE.
+#' @param ... Additional arguments passed to \code{write.table()}.
+#' @return Invisibly returns the path to the written file.
+#' @importFrom utils write.table
+#' @examples
+#' \dontrun{
+#' xvg <- read_xvg(system.file("extdata/rmsd.xvg", package = "xvm"))
+#' # Export as TSV
+#' export_xvg(xvg, "rmsd.tsv", sep = "\t")
+#' # Export as CSV
+#' export_xvg(xvg, "rmsd.csv", sep = ",")
+#' }
+#' @export
+export_xvg <- function(xvg_data, file, sep = "\t", row.names = FALSE, merge = FALSE, ...) {
+  if (inherits(xvg_data, "xvg_data")) {
+    df <- xvg_data$data
+  }
+  else if (is.list(xvg_data)) {
+    if ("data" %in% names(xvg_data) && "metadata" %in% names(xvg_data)) {
+      df <- xvg_data$data
+    } else if (length(xvg_data) > 0) {
+      first_element <- xvg_data[[1]]
+      if (inherits(first_element, "xvg_data")) {
+        if (merge) {
+          merged_data <- merge_xvg_data(xvg_data)
+          df <- merged_data$data
+        } else {
+          warning("Multiple XVG datasets provided, using the first one: ", names(xvg_data)[1])
+          df <- xvg_data[[1]]$data
+        }
+      } else {
+        stop("Invalid input: expected an xvg_data object or a list of xvg_data objects")
+      }
+    } else {
+      stop("Empty list provided")
+    }
+  } else {
+    stop("export_xvg() requires an object of class 'xvg_data' or a list of 'xvg_data' objects")
+  }
+  dir.create(dirname(file), showWarnings = FALSE, recursive = TRUE)
+  utils::write.table(
+    df,
+    file = file,
+    sep = sep,
+    row.names = row.names,
+    quote = FALSE,
+    ...
+  )
+  message("Data exported to ", file)
+  invisible(file)
 }
 
 
